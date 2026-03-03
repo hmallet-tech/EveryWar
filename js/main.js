@@ -21,6 +21,7 @@ let selectedFaction = 'human';
 let selectedDiff = 'easy';
 let selectedMap = 'random';
 let selectedSize = 'medium';
+let selectedWeather = 'on';
 
 // ─── Loading sequence ────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
@@ -53,42 +54,78 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 function _bindMenus() {
     // Main menu
     $('btn-play').onclick = () => { hide('main-menu'); show('setup-screen'); };
+    $('btn-codex').onclick = () => { hide('main-menu'); show('codex-screen'); };
+    $('btn-codex-back').onclick = () => { hide('codex-screen'); show('main-menu'); };
     $('btn-help').onclick = () => { hide('main-menu'); show('help-screen'); };
     $('btn-help-back').onclick = () => { hide('help-screen'); show('main-menu'); };
 
-    // Setup screen – factions
+    // Codex tabs
+    document.querySelectorAll('.codex-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.codex-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.codex-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            const panel = document.getElementById('tab-' + tab.dataset.tab);
+            if (panel) panel.classList.add('active');
+        });
+    });
+
+    // ─── DELEGATED handler for all choice buttons ───────────────────────────
+    // One listener on document handles ALL .choice-btn groups (robust, no timing issues)
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.choice-btn');
+        if (!btn) return;
+
+        // Faction cards
+        if (btn.dataset.faction !== undefined || btn.closest('.faction-card')) {
+            const card = btn.closest('[data-faction]') || btn;
+            if (card.dataset.faction) {
+                document.querySelectorAll('.faction-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                selectedFaction = card.dataset.faction;
+            }
+            return;
+        }
+
+        // Difficulty
+        if (btn.dataset.diff !== undefined) {
+            document.querySelectorAll('.choice-btn[data-diff]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedDiff = btn.dataset.diff;
+            return;
+        }
+
+        // Map type
+        if (btn.dataset.map !== undefined) {
+            document.querySelectorAll('.choice-btn[data-map]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedMap = btn.dataset.map;
+            return;
+        }
+
+        // Map size
+        if (btn.dataset.size !== undefined) {
+            document.querySelectorAll('.choice-btn[data-size]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedSize = btn.dataset.size;
+            return;
+        }
+
+        // Weather
+        if (btn.dataset.weather !== undefined) {
+            document.querySelectorAll('.choice-btn[data-weather]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedWeather = btn.dataset.weather;
+            return;
+        }
+    });
+
+    // Faction card clicks (the card itself, not just a button)
     document.querySelectorAll('.faction-card').forEach(card => {
         card.addEventListener('click', () => {
             document.querySelectorAll('.faction-card').forEach(c => c.classList.remove('selected'));
             card.classList.add('selected');
             selectedFaction = card.dataset.faction;
-        });
-    });
-
-    // Difficulty
-    document.querySelectorAll('.choice-btn[data-diff]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.choice-btn[data-diff]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            selectedDiff = btn.dataset.diff;
-        });
-    });
-
-    // Map type
-    document.querySelectorAll('.choice-btn[data-map]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.choice-btn[data-map]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            selectedMap = btn.dataset.map;
-        });
-    });
-
-    // Map size
-    document.querySelectorAll('.choice-btn[data-size]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.choice-btn[data-size]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            selectedSize = btn.dataset.size;
         });
     });
 
@@ -137,7 +174,7 @@ function _startGame() {
     // Apply map size BEFORE creating Game (TileMap/FogOfWar read MapConfig at construction)
     MapConfig.setSize(selectedSize);
 
-    game = new Game(canvas, selectedFaction, selectedDiff, selectedMap);
+    game = new Game(canvas, selectedFaction, selectedDiff, selectedMap, selectedWeather === 'on');
 
     // Wire build menu
     buildMenu = new BuildMenu(game);

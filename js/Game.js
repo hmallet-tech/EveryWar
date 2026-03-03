@@ -30,13 +30,14 @@ import { resetIds } from './entities/Entity.js';
 import { MapConfig } from './mapConfig.js';
 
 export class Game {
-    constructor(canvas, playerFaction, aiDifficulty, mapType) {
+    constructor(canvas, playerFaction, aiDifficulty, mapType, enableWeather = true) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.playerFaction = playerFaction;
         this.aiFaction = playerFaction === 'human' ? 'orc' : 'human';
         this.aiDifficulty = aiDifficulty;
         this.mapType = mapType;
+        this.enableWeather = enableWeather;
 
         this.running = false;
         this.paused = false;
@@ -242,12 +243,14 @@ export class Game {
         this.ai?.update(dt);
 
         // Weather
-        this.weather.update(dt);
-        this._weatherTimer += dt;
-        if (this._weatherTimer >= this._nextWeatherIn) {
-            this._weatherTimer = 0;
-            this._nextWeatherIn = 60 + Math.random() * 90;
-            this._triggerRandomWeather();
+        if (this.enableWeather) {
+            this.weather.update(dt);
+            this._weatherTimer += dt;
+            if (this._weatherTimer >= this._nextWeatherIn) {
+                this._weatherTimer = 0;
+                this._nextWeatherIn = 60 + Math.random() * 90;
+                this._triggerRandomWeather();
+            }
         }
 
         // Voice alerts
