@@ -1,0 +1,21 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+
+# Build outputs
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Local dev server logs
+*.log
+
+# Temp / test files
+/tmp/

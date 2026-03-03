@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EveryWar – Stratégie en Temps Réel</title>
+  <meta name="description" content="EveryWar – RTS inspiré de Warcraft 2. Jouez contre l'IA dans des batailles épiques.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loading-screen">
+    <h1 class="game-title">⚔ EveryWar</h1>
+    <p style="color:#a08030;margin-bottom:30px;letter-spacing:3px;font-size:0.9rem">STRATÉGIE EN TEMPS RÉEL</p>
+    <div id="loading-bar-container"><div id="loading-bar"></div></div>
+    <p id="loading-text" style="margin-top:12px;color:#6a4800;font-size:0.8rem">Chargement…</p>
+  </div>
+
+  <!-- ===== MAIN MENU ===== -->
+  <div id="main-menu" class="screen hidden">
+    <div class="menu-bg-animated"></div>
+    <div class="menu-content">
+      <h1 class="game-title">⚔ EveryWar</h1>
+      <p class="game-subtitle">Stratégie en Temps Réel</p>
+      <div class="menu-buttons">
+        <button id="btn-play" class="menu-btn primary">▶&nbsp; Jouer (vs&nbsp;IA)</button>
+        <button id="btn-help" class="menu-btn">❓&nbsp; Aide &amp; Contrôles</button>
+      </div>
+      <p class="version-tag">v1.0.0 – Solo vs IA</p>
+    </div>
+  </div>
+
+  <!-- ===== SETUP SCREEN ===== -->
+  <div id="setup-screen" class="screen hidden">
+    <div class="menu-bg-animated"></div>
+    <div class="menu-content wide">
+      <h2 class="screen-title">Configuration de Partie</h2>
+      <div class="setup-grid">
+
+        <div class="setup-section">
+          <h3>Votre Faction</h3>
+          <div class="faction-picker">
+            <div class="faction-card selected" data-faction="human">
+              <div class="faction-icon">🏰</div>
+              <div class="faction-name">Valorée</div>
+              <div class="faction-desc">Humains · Magie &amp; Discipline</div>
+              <div class="faction-units">Fantassin · Archer · Chevalier · Mage · Paladin</div>
+            </div>
+            <div class="faction-card" data-faction="orc">
+              <div class="faction-icon">🔥</div>
+              <div class="faction-name">Skarag</div>
+              <div class="faction-desc">Orcs · Force &amp; Brutalité</div>
+              <div class="faction-units">Berserker · Archer Gobelin · Worg Rider · Chaman · Beastmaster</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-section">
+          <h3>Difficulté IA</h3>
+          <div class="choice-group">
+            <button class="choice-btn active" data-diff="easy">😊 Facile<br><small>Pour découvrir le jeu</small></button>
+            <button class="choice-btn" data-diff="normal">⚔ Normal<br><small>Équilibré et challengeant</small></button>
+            <button class="choice-btn" data-diff="hard">💀 Difficile<br><small>IA agressive et optimisée</small></button>
+          </div>
+        </div>
+
+        <div class="setup-section">
+          <h3>Type de Carte</h3>
+          <div class="choice-group">
+            <button class="choice-btn active" data-map="random">🎲 Aléatoire</button>
+            <button class="choice-btn" data-map="highlands">🏔 Hautes Terres</button>
+            <button class="choice-btn" data-map="islands">🏝 Archipel</button>
+          </div>
+        </div>
+
+      </div>
+      <div class="setup-actions">
+        <button id="btn-back" class="menu-btn">← Retour</button>
+        <button id="btn-start" class="menu-btn primary">⚔ Commencer la Bataille</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HELP SCREEN ===== -->
+  <div id="help-screen" class="screen hidden">
+    <div class="menu-content wide">
+      <h2 class="screen-title">Aide &amp; Contrôles</h2>
+      <div class="help-grid">
+        <div class="help-col">
+          <h3>🖱 Souris</h3>
+          <table class="help-table">
+            <tr><td>Clic gauche</td><td>Sélectionner</td></tr>
+            <tr><td>Drag gauche</td><td>Sélection multiple</td></tr>
+            <tr><td>Double-clic</td><td>Sélect. même type (écran)</td></tr>
+            <tr><td>Clic droit</td><td>Commande contextuelle</td></tr>
+            <tr><td>Bords de l'écran</td><td>Faire défiler la carte</td></tr>
+            <tr><td>Clic Minimap</td><td>Téléporter la vue</td></tr>
+          </table>
+        </div>
+        <div class="help-col">
+          <h3>⌨️ Clavier</h3>
+          <table class="help-table">
+            <tr><td>WASD / Flèches</td><td>Défilement caméra</td></tr>
+            <tr><td>Echap</td><td>Désélectionner / Pause</td></tr>
+            <tr><td>1–9</td><td>Rappeler groupe</td></tr>
+            <tr><td>Ctrl+1–9</td><td>Assigner groupe</td></tr>
+            <tr><td>A</td><td>Attack-move</td></tr>
+            <tr><td>S</td><td>Stop</td></tr>
+            <tr><td>H</td><td>Hold position</td></tr>
+            <tr><td>+/−</td><td>Vitesse de jeu</td></tr>
+            <tr><td>Espace</td><td>Centrer sélection</td></tr>
+          </table>
+        </div>
+        <div class="help-col">
+          <h3>🎮 Objectif</h3>
+          <p class="help-text">Récoltez de l'or et du bois pour construire des bâtiments et entraîner des unités. Recherchez des améliorations, formez une armée, et détruisez le <strong>Town Hall</strong> (ou Grande Salle) ennemi pour remporter la victoire !</p>
+          <h3 style="margin-top:16px">💡 Ressources</h3>
+          <table class="help-table">
+            <tr><td>🪙 Or</td><td>Mines d'or (paysans)</td></tr>
+            <tr><td>🪵 Bois</td><td>Forêts (paysans)</td></tr>
+            <tr><td>🍖 Nourriture</td><td>Fermes / Enclos</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="setup-actions">
+        <button id="btn-help-back" class="menu-btn primary">← Retour au Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== GAME SCREEN ===== -->
+  <div id="game-screen" class="screen hidden">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD LAYER (DOM over canvas) -->
+    <div id="hud">
+
+      <!-- TOP BAR -->
+      <div id="top-bar">
+        <div id="resources">
+          <span class="res-item" id="res-gold" title="Or">🪙 <span id="gold-val">500</span></span>
+          <span class="res-item" id="res-wood" title="Bois">🪵 <span id="wood-val">200</span></span>
+          <span class="res-item res-food" id="res-food" title="Nourriture">🍖 <span id="food-val">4</span>/<span id="food-max">10</span></span>
+        </div>
+        <div id="center-bar">
+          <span id="alert-banner" class="hidden"></span>
+          <span id="game-time">⏱ <span id="time-val">00:00</span></span>
+        </div>
+        <div id="top-controls">
+          <button id="btn-speed" title="Vitesse (Touche +/-)">▶ ×1</button>
+          <button id="btn-pause" title="Pause (Echap)">⏸</button>
+          <button id="btn-esc-menu" title="Menu">☰</button>
+        </div>
+      </div>
+
+      <!-- BOTTOM PANEL -->
+      <div id="bottom-panel">
+        <!-- Minimap -->
+        <div id="minimap-wrap">
+          <canvas id="minimap-canvas" width="192" height="192"></canvas>
+          <div id="minimap-label">🗺 Minimap</div>
+        </div>
+
+        <!-- Selection panel -->
+        <div id="sel-panel">
+          <div id="sel-portrait" title="Unité sélectionnée">–</div>
+          <div id="sel-info">
+            <div id="sel-name">Aucune sélection</div>
+            <div id="sel-hp-bar-wrap" class="hidden">
+              <div id="sel-hp-bar"></div>
+            </div>
+            <div id="sel-stats"></div>
+            <div id="sel-status"></div>
+          </div>
+          <div id="multi-sel-list"></div>
+        </div>
+
+        <!-- Command card: 3x3 grid of action buttons -->
+        <div id="cmd-card">
+          <!-- filled by HUD.js -->
+        </div>
+      </div>
+
+      <!-- Alerts toast container -->
+      <div id="alerts-box"></div>
+
+      <!-- Selection drag rectangle -->
+      <div id="sel-rect"></div>
+
+      <!-- Hotkey reminder -->
+      <div id="hotkey-hint">A=Attaque-move · S=Stop · H=Hold · Espace=Centrer</div>
+
+    </div><!-- end #hud -->
+
+    <!-- Pause overlay -->
+    <div id="pause-overlay" class="overlay hidden">
+      <div class="overlay-box">
+        <h2>Pause</h2>
+        <button id="btn-resume" class="menu-btn primary">▶ Reprendre</button>
+        <button id="btn-to-menu" class="menu-btn">🏠 Menu Principal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== END SCREEN ===== -->
+  <div id="end-screen" class="screen hidden">
+    <div class="menu-bg-animated"></div>
+    <div class="menu-content">
+      <h2 id="end-title">Victoire !</h2>
+      <div id="end-stats"></div>
+      <div class="menu-buttons">
+        <button id="btn-play-again" class="menu-btn primary">↺ Rejouer</button>
+        <button id="btn-end-menu" class="menu-btn">🏠 Menu Principal</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
