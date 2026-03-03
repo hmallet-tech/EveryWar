@@ -14,12 +14,20 @@ import { Projectile } from './entities/Projectile.js';
 import { AIManager } from './ai/AIManager.js';
 import { HUD } from './ui/HUD.js';
 import { Minimap } from './ui/Minimap.js';
+import { WeatherSystem, WEATHER_TYPE } from './systems/Weather.js';
+import { FORMATION_TYPES, moveInFormation } from './systems/Formation.js';
+import {
+    playMeleeHit, playRangedHit, playDeath, playConstruct, playBuildComplete,
+    playUnitReady, playGoldClink, playWoodChop, playAlert, playExplosion,
+    playLightning, playResearch, playClick
+} from './engine/Audio.js';
 import {
     TILE_SIZE, MAP_W, MAP_H, FOG, STATE, FACTION, GAME_SPEEDS, COLOR,
     DEATH_TIME, BSIZE
 } from './constants.js';
 import { BUILDINGS, UNITS, RESEARCH, FACTION_DATA, FACTION_COLOR } from './data.js';
 import { resetIds } from './entities/Entity.js';
+import { MapConfig } from './mapConfig.js';
 
 export class Game {
     constructor(canvas, playerFaction, aiDifficulty, mapType) {
@@ -96,6 +104,32 @@ export class Game {
         this._ctrlGroups = {};
 
         this._fogTimer = 0;
+
+        // Weather
+        this.weather = new WeatherSystem(canvas);
+        this._weatherTimer = 0;
+        this._nextWeatherIn = 90 + Math.random() * 60; // first event in 90-150s
+
+        // Formation cycling
+        this.formationIndex = 0; // index into FORMATION_TYPES
+
+        // Voice alerts (Speech API)
+        this._voiceAlerts = new Set();
+        this._lastVoiceAlert = 0;
+    }
+
+    /** Text-to-speech alert (throttled to 1 per 8s per topic) */
+    voiceAlert(text, topic = 'generic') {
+        if (!window.speechSynthesis) return;
+        const now = this.elapsedTime;
+        const key = `${topic}_${Math.floor(now / 8)}`;
+        if (this._voiceAlerts.has(key)) return;
+        this._voiceAlerts.add(key);
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.lang = 'fr-FR';
+        utt.rate = 1.1;
+        utt.volume = 0.8;
+        speechSynthesis.speak(utt);
     }
 
     _preloadSprites() {
@@ -207,6 +241,18 @@ export class Game {
         // AI
         this.ai?.update(dt);
 
+        // Weather
+        this.weather.update(dt);
+        this._weatherTimer += dt;
+        if (this._weatherTimer >= this._nextWeatherIn) {
+            this._weatherTimer = 0;
+            this._nextWeatherIn = 60 + Math.random() * 90;
+            this._triggerRandomWeather();
+        }
+
+        // Voice alerts
+        this._checkVoiceAlerts();
+
         // Victory check
         this._checkVictory();
 
@@ -219,6 +265,33 @@ export class Game {
 
         // Render
         this._render();
+    }
+
+    _triggerRandomWeather() {
+        const types = [WEATHER_TYPE.RAIN, WEATHER_TYPE.FOG, WEATHER_TYPE.NONE];
+        const t = types[Math.floor(Math.random() * types.length)];
+        if (t === WEATHER_TYPE.NONE) { this.weather.clearWeather(); return; }
+        const intensity = 0.4 + Math.random() * 0.5;
+        const duration = 30 + Math.random() * 60;
+        this.weather.setWeather(t, intensity, duration);
+        const label = t === WEATHER_TYPE.RAIN ? 'Pluie' : 'Brouillard';
+        this.hud?.addAlert(`☁ ${label} !`, 'weather');
+    }
+
+    _checkVoiceAlerts() {
+        const eco = this.economy[this.playerFaction];
+        // Low food
+        if (eco.foodMax - eco.food <= 2) {
+            this.voiceAlert('Nourriture faible !', 'food');
+        }
+        // Under attack (player entity took damage recently)
+        const underAttack = this.entities.some(e =>
+            e.faction === this.playerFaction && !e.dead && e.hitFlash > 0.1
+        );
+        if (underAttack) {
+            this.voiceAlert('Sous le feu ennemi !', 'attack');
+            playAlert();
+        }
     }
 
     // ─── INPUT HANDLING ─────────────────────────────────────────────────────────
@@ -263,15 +336,22 @@ export class Game {
 
         // Unit commands via keyboard
         if (sel.hasUnits) {
-            if (inp.isKeyDown('KeyA')) { sel.commandMode = 'attack'; this.canvas.style.cursor = 'crosshair'; }
+            if (inp.isKeyDown('KeyA')) { sel.commandMode = 'attack'; this.canvas.style.cursor = 'crosshair'; playClick(); }
             if (inp.isKeyDown('KeyS')) sel.selected.forEach(u => u.stop && u.stop());
             if (inp.isKeyDown('KeyH')) sel.selected.forEach(u => u.hold && u.hold());
-            if (inp.isKeyDown('KeyM')) { sel.commandMode = 'move'; this.canvas.style.cursor = 'crosshair'; }
+            if (inp.isKeyDown('KeyM')) { sel.commandMode = 'move'; this.canvas.style.cursor = 'crosshair'; playClick(); }
+            // Ctrl+F: cycle formation
+            if (inp.isKeyDown('KeyF') && (inp.isKey('ControlLeft') || inp.isKey('ControlRight'))) {
+                this.formationIndex = (this.formationIndex + 1) % FORMATION_TYPES.length;
+                const fname = FORMATION_TYPES[this.formationIndex];
+                const labels = { line: 'Ligne', wedge: 'Coin', circle: 'Cercle', scatter: 'Dispersé' };
+                this.hud?.addAlert(`⬛ Formation : ${labels[fname]}`, 'formation');
+            }
         }
 
         // Build mode shortcuts
         if (sel.hasWorkers && !this.buildMode) {
-            if (inp.isKeyDown('KeyB')) this.openBuildMenu();
+            if (inp.isKeyDown('KeyB')) { this.openBuildMenu(); playClick(); }
         }
 
         // Mouse clicks
@@ -520,6 +600,7 @@ export class Game {
             worker.startConstruct(b, path);
             b.builderRef = worker;
         }
+        playConstruct();
         this.hud.addAlert(`🔨 Construction de ${b.label}`, 'info');
     }
 
@@ -575,6 +656,7 @@ export class Game {
 
     // ─── CALLBACKS ──────────────────────────────────────────────────────────────
     onBuildingComplete(b) {
+        playBuildComplete();
         if (b.faction === this.playerFaction) {
             this.hud.addAlert(`✅ ${b.label} terminé !`, 'good');
         }
@@ -584,7 +666,10 @@ export class Game {
         if (isResearch) {
             this.research[b.faction][key] = true;
             this._applyResearch(b.faction, key);
-            if (b.faction === this.playerFaction) this.hud.addAlert(`🔬 ${RESEARCH[key]?.label} terminé !`, 'good');
+            if (b.faction === this.playerFaction) {
+                playResearch();
+                this.hud.addAlert(`🔬 ${RESEARCH[key]?.label} terminé !`, 'good');
+            }
         } else {
             // Spawn unit at rally point
             let rx = b.rallyX, ry = b.rallyY;
@@ -677,6 +762,9 @@ export class Game {
 
         // 5. Fog of War
         this.fog.render(ctx, cam, TILE_SIZE);
+
+        // 5.5 Weather overlay (rain / fog of war)
+        this.weather.render(ctx);
 
         // 6. Selection rings & health bars (drawn OVER fog on player's units)
         this._renderSelectionHints(ctx, cam);
