@@ -42,7 +42,6 @@ export class Input {
         this.canvas.addEventListener('mouseleave', () => { this.mouseInCanvas = false; });
 
         this.canvas.addEventListener('mousedown', e => {
-            e.preventDefault();
             this.buttons[e.button] = true;
             this.buttonsDown[e.button] = true;
             if (e.button === 0) {
@@ -52,7 +51,6 @@ export class Input {
         });
 
         this.canvas.addEventListener('mouseup', e => {
-            e.preventDefault();
             this.buttons[e.button] = false;
             this.buttonsUp[e.button] = true;
             if (e.button === 0) {

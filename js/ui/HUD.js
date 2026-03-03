@@ -27,6 +27,7 @@ export class HUD {
         this._alertsBox = this.$('alerts-box');
         this._selRect = this.$('sel-rect');
         this._speedBtn = this.$('btn-speed');
+        this._lastSelId = ''; // Track selection for optimized updates
     }
 
     update(dt) {
@@ -63,68 +64,90 @@ export class HUD {
 
     _updateSelectionPanel() {
         const sel = this.game.selection.selected;
+
+        // Structure ID: determines if we need to rebuild the DOM elements (icons, buttons)
+        // We only rebuild if the set of entities changes, or their "type/state" changes (building complete, queue len)
+        const structId = sel.map(e => e.id).sort().join(',') +
+            (sel.length === 1 ? `:${sel[0].type}:${sel[0].isBuilding}:${sel[0].queue?.length || 0}:${sel[0].state || ''}` : '');
+
+        const structChanged = structId !== this._lastSelId;
+
         if (sel.length === 0) {
-            this._selPortrait.textContent = '–';
-            this._selName.textContent = 'Aucune sélection';
-            this._selStats.innerHTML = '';
-            this._selStatus.textContent = '';
-            this._selHpWrap.classList.add('hidden');
-            this._multiList.innerHTML = '';
-            this._cmdCard.innerHTML = '';
+            if (structChanged) {
+                this._selPortrait.textContent = '–';
+                this._selName.textContent = 'Aucune sélection';
+                this._selStats.innerHTML = '';
+                this._selStatus.textContent = '';
+                this._selHpWrap.classList.add('hidden');
+                this._multiList.innerHTML = '';
+                this._cmdCard.innerHTML = '';
+                this._lastSelId = structId;
+            }
             return;
         }
 
         if (sel.length === 1) {
             const e = sel[0];
-            this._selPortrait.textContent = e.icon || (e.type === 'building' ? '🏠' : '⚔️');
-            this._selName.textContent = e.label;
-            this._selHpWrap.classList.remove('hidden');
 
+            // Rebuild structure only if fundamentally changed
+            if (structChanged) {
+                this._selPortrait.textContent = e.icon || (e.type === 'building' ? '🏠' : '⚔️');
+                this._selName.textContent = e.label;
+                this._selHpWrap.classList.remove('hidden');
+                this._buildCommandCard(e);
+                this._lastSelId = structId;
+            }
+
+            // ALWAYS update visual values (HP, progress, stats) - this doesn't break clicks
             const pct = e.hpRatio * 100;
             this._selHpBar.style.width = pct + '%';
             this._selHpBar.className = pct > 66 ? 'hp-high' : pct > 33 ? 'hp-med' : 'hp-low';
 
-            // Stats
             if (e.type === 'unit') {
                 this._selStats.innerHTML =
                     `❤️ ${Math.ceil(e.hp)}/${e.maxHp} &nbsp;⚔ ${e.dmg} &nbsp;🛡 ${e.armor}<br>` +
                     `👁 ${e.sight} tiles &nbsp;💨 ${Math.round(e.speed)}`;
             } else {
-                this._selStats.innerHTML =
-                    `❤️ ${Math.ceil(e.hp)}/${e.maxHp} &nbsp;🛡 ${e.armor}` +
-                    (e.queue?.length ? `<br>📦 File: ${e.queue.length}/5` : '');
+                let statsHtml = `❤️ ${Math.ceil(e.hp)}/${e.maxHp} &nbsp;🛡 ${e.armor}`;
+                if (e.queue?.length) {
+                    const q = e.queue[0];
+                    const qPct = Math.round(q.progress * 100);
+                    statsHtml += `<br>📦 File: ${e.queue.length}/5 (${qPct}%)`;
+                }
                 if (e.isBuilding) {
                     const pct2 = Math.round(e.buildProgress * 100);
-                    this._selStats.innerHTML += `<br>🔨 Construction: ${pct2}%`;
+                    statsHtml += `<br>🔨 Construction: ${pct2}%`;
                 }
+                this._selStats.innerHTML = statsHtml;
             }
             this._selStatus.textContent = e.statusText || '';
-            this._multiList.innerHTML = '';
-            this._buildCommandCard(e);
         } else {
             // Multi-selection
-            const first = sel[0];
-            this._selPortrait.textContent = first.icon || '⚔️';
-            this._selName.textContent = `${sel.length} entités sélectionnées`;
-            this._selHpWrap.classList.add('hidden');
-            this._selStats.innerHTML = '';
-            this._selStatus.textContent = '';
+            if (structChanged) {
+                const first = sel[0];
+                this._selPortrait.textContent = first.icon || '⚔️';
+                this._selName.textContent = `${sel.length} entités sélectionnées`;
+                this._selHpWrap.classList.add('hidden');
+                this._selStats.innerHTML = '';
+                this._selStatus.textContent = '';
 
-            // Multi-unit icons
-            this._multiList.innerHTML = '';
-            sel.slice(0, 12).forEach(e => {
-                const div = document.createElement('div');
-                div.className = 'ms-icon';
-                div.textContent = e.icon || '⚔️';
-                div.title = e.label;
-                const hp = document.createElement('div');
-                hp.className = 'ms-hp ' + (e.hpRatio > 0.66 ? 'hp-high' : e.hpRatio > 0.33 ? 'hp-med' : 'hp-low');
-                hp.style.width = Math.round(e.hpRatio * 100) + '%';
-                div.appendChild(hp);
-                div.onclick = () => { this.game.selection.select([e]); };
-                this._multiList.appendChild(div);
-            });
-            this._buildMultiCommandCard(sel);
+                // Multi-unit icons
+                this._multiList.innerHTML = '';
+                sel.slice(0, 12).forEach(e => {
+                    const div = document.createElement('div');
+                    div.className = 'ms-icon';
+                    div.textContent = e.icon || '⚔️';
+                    div.title = e.label;
+                    const hp = document.createElement('div');
+                    hp.className = 'ms-hp ' + (e.hpRatio > 0.66 ? 'hp-high' : e.hpRatio > 0.33 ? 'hp-med' : 'hp-low');
+                    hp.style.width = Math.round(e.hpRatio * 100) + '%';
+                    div.appendChild(hp);
+                    div.onclick = () => { this.game.selection.select([e]); };
+                    this._multiList.appendChild(div);
+                });
+                this._buildMultiCommandCard(sel);
+                this._lastSelId = structId;
+            }
         }
     }
 

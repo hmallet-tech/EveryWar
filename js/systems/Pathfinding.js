@@ -1,5 +1,5 @@
 // js/systems/Pathfinding.js – A* with binary heap priority queue
-import { MAP_W, MAP_H } from '../constants.js';
+import { MapConfig } from '../mapConfig.js';
 
 // Binary min-heap keyed on f score
 class Heap {
@@ -42,9 +42,10 @@ const DIRS = [
 export class Pathfinder {
     constructor(tileMap) {
         this.map = tileMap;
-        this._gScore = new Float32Array(MAP_W * MAP_H);
-        this._visited = new Uint8Array(MAP_W * MAP_H);
-        this._parent = new Int32Array(MAP_W * MAP_H);
+        const size = MapConfig.W * MapConfig.H;
+        this._gScore = new Float32Array(size);
+        this._visited = new Uint8Array(size);
+        this._parent = new Int32Array(size);
     }
 
     /** Find path from tile (sx,sy) to (ex,ey).
@@ -65,7 +66,7 @@ export class Pathfinder {
         const parent = this._parent;
         g.fill(Infinity); visited.fill(0); parent.fill(-1);
 
-        const startIdx = sy * MAP_W + sx;
+        const startIdx = sy * MapConfig.W + sx;
         g[startIdx] = 0;
         const h = (tx, ty) => Math.sqrt((tx - ex) ** 2 + (ty - ey) ** 2);
         const heap = new Heap();
@@ -74,7 +75,7 @@ export class Pathfinder {
         let iters = 0;
         while (heap.size > 0 && iters++ < maxTiles) {
             const { tx, ty } = heap.pop();
-            const idx = ty * MAP_W + tx;
+            const idx = ty * MapConfig.W + tx;
             if (visited[idx]) continue;
             visited[idx] = 1;
             if (tx === ex && ty === ey) return this._reconstruct(ex, ey);
@@ -82,7 +83,7 @@ export class Pathfinder {
             for (const [dx, dy, dc] of DIRS) {
                 const nx = tx + dx, ny = ty + dy;
                 if (!this.map.isPassable(nx, ny)) continue;
-                const nidx = ny * MAP_W + nx;
+                const nidx = ny * MapConfig.W + nx;
                 if (visited[nidx]) continue;
                 const ng = g[idx] + dc * this.map.getCost(nx, ny);
                 if (ng < g[nidx]) {
@@ -98,9 +99,9 @@ export class Pathfinder {
 
     _reconstruct(ex, ey) {
         const path = [];
-        let idx = ey * MAP_W + ex;
+        let idx = ey * MapConfig.W + ex;
         while (idx >= 0 && this._parent[idx] !== -1) {
-            path.push({ tx: idx % MAP_W, ty: Math.floor(idx / MAP_W) });
+            path.push({ tx: idx % MapConfig.W, ty: Math.floor(idx / MapConfig.W) });
             idx = this._parent[idx];
         }
         path.reverse();

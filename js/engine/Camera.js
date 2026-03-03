@@ -1,19 +1,20 @@
 // js/engine/Camera.js – Camera system with smooth scrolling + edge-pan
-import { TILE_SIZE, MAP_W, MAP_H, CAM_SPEED, CAM_EDGE } from '../constants.js';
+import { TILE_SIZE, CAM_SPEED, CAM_EDGE } from '../constants.js';
+import { MapConfig } from '../mapConfig.js';
 
 export class Camera {
     constructor(viewW, viewH) {
         this.x = 0; this.y = 0;
         this.viewW = viewW;
         this.viewH = viewH;
-        this.maxX = MAP_W * TILE_SIZE - viewW;
-        this.maxY = MAP_H * TILE_SIZE - viewH;
+        this.maxX = MapConfig.W * TILE_SIZE - viewW;
+        this.maxY = MapConfig.H * TILE_SIZE - viewH;
     }
 
     resize(w, h) {
         this.viewW = w; this.viewH = h;
-        this.maxX = MAP_W * TILE_SIZE - w;
-        this.maxY = MAP_H * TILE_SIZE - h;
+        this.maxX = MapConfig.W * TILE_SIZE - w;
+        this.maxY = MapConfig.H * TILE_SIZE - h;
         this.clamp();
     }
 

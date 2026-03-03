@@ -49,6 +49,9 @@ export class Unit extends Entity {
         this.xp = 0;
         this.level = 1;
 
+        // Construction
+        this.buildTarget = null; // Building being constructed
+
         // Flocking
         this.groupId = -1;  // control group
         this.flockOffset = { x: 0, y: 0 };
@@ -84,6 +87,19 @@ export class Unit extends Entity {
         this.state = STATE.ATTACKING;
     }
 
+    /** Begin construction of a building */
+    startConstruct(building, path) {
+        if (!this.isWorker) return;
+        this.buildTarget = building;
+        this.path = path || [];
+        this.pathIndex = 0;
+        this.moveTarget = { x: building.x, y: building.y };
+        this.state = STATE.CONSTRUCTING;
+        this.harvestTarget = null;
+        this.attackTarget = null;
+        this._pathTimer = 0; // force immediate path recalculation
+    }
+
     /** Issue harvest order */
     harvest(resourceRef, returnBuilding) {
         if (!this.isWorker) return;
@@ -95,6 +111,11 @@ export class Unit extends Entity {
     }
 
     stop() {
+        // Release construction site if assigned
+        if (this.buildTarget && this.buildTarget.builderRef === this) {
+            this.buildTarget.builderRef = null;
+        }
+        this.buildTarget = null;
         this.path = [];
         this.pathIndex = 0;
         this.moveTarget = null;
@@ -127,7 +148,83 @@ export class Unit extends Entity {
             case STATE.HARVESTING: this._updateHarvesting(dt, game); break;
             case STATE.RETURNING: this._updateReturning(dt, game); break;
             case STATE.HOLD: this._updateHold(dt, game); break;
+            case STATE.CONSTRUCTING: this._updateConstructing(dt, game); break;
         }
+    }
+
+    _updateConstructing(dt, game) {
+        const b = this.buildTarget;
+        // Building finished or cancelled?
+        if (!b || b.dead) {
+            this.buildTarget = null;
+            this.state = STATE.IDLE;
+            return;
+        }
+        if (!b.isBuilding) {
+            // Construction complete - free the worker
+            if (b.builderRef === this) b.builderRef = null;
+            this.buildTarget = null;
+            this.state = STATE.IDLE;
+            return;
+        }
+
+        // Check if already close enough to work (use building edge, not center)
+        const buildRange = 32 * 2.5;
+        // Distance to nearest edge of building rect
+        const edgeX = Math.max(b.tx0 * 32, Math.min(this.x, (b.tx0 + b.tw) * 32));
+        const edgeY = Math.max(b.ty0 * 32, Math.min(this.y, (b.ty0 + b.th) * 32));
+        const edgeDist = Math.hypot(this.x - edgeX, this.y - edgeY);
+
+        if (edgeDist <= buildRange) {
+            // On site: stop and contribute to construction
+            this.vx = 0; this.vy = 0;
+            this.path = [];
+            b.buildProgress += dt / b.buildTime; // worker doubles speed
+            return;
+        }
+
+        // Need to move closer - use pathfinding to best adjacent tile
+        this._pathTimer = (this._pathTimer || 0) - dt;
+        if (this._pathTimer <= 0 || !this.path || this.pathIndex >= this.path.length) {
+            this._pathTimer = 2.0;
+            const adj = this._findBuildingSide(b, game);
+            if (adj) {
+                const path = game.pathfinder.find(this.tx, this.ty, adj.tx, adj.ty);
+                if (path && path.length > 0) {
+                    this.path = path;
+                    this.pathIndex = 0;
+                } else {
+                    // No path found - try direct movement as fallback
+                    this._moveTowards(adj.tx * 32 + 16, adj.ty * 32 + 16, dt, game);
+                    return;
+                }
+            }
+        }
+        this._stepAlongPath(dt);
+    }
+
+    /** Find the nearest passable tile adjacent to a building */
+    _findBuildingSide(b, game) {
+        const candidates = [];
+        const { tx0, ty0, tw, th } = b;
+        // All tiles around the building perimeter
+        for (let x = tx0 - 1; x <= tx0 + tw; x++) {
+            candidates.push({ tx: x, ty: ty0 - 1 });      // top row
+            candidates.push({ tx: x, ty: ty0 + th });    // bottom row
+        }
+        for (let y = ty0; y < ty0 + th; y++) {
+            candidates.push({ tx: tx0 - 1, ty: y });      // left col
+            candidates.push({ tx: tx0 + tw, ty: y });    // right col
+        }
+        // Pick the nearest passable tile to this worker
+        let best = null, bestDist = Infinity;
+        for (const c of candidates) {
+            if (!game.tileMap.isPassable(c.tx, c.ty)) continue;
+            const wx = c.tx * 32 + 16, wy = c.ty * 32 + 16;
+            const d = Math.hypot(this.x - wx, this.y - wy);
+            if (d < bestDist) { bestDist = d; best = c; }
+        }
+        return best;
     }
 
     _updateIdle(dt, game) {
@@ -285,9 +382,13 @@ export class Unit extends Entity {
                     game.tileMap.setTile(tx, ty, 4); // stays as depleted
                 }
             } else if (rtype === 'wood') {
-                // Harvest tree (disappears)
-                game.tileMap.harvestTree(tx, ty);
-                this.carryWood = HARVEST_CARRY;
+                // Check if tree still has wood left
+                const taken = game.tileMap.harvestTree(tx, ty, HARVEST_CARRY);
+                if (taken <= 0) {
+                    // Tile was exhausted or not a forest anymore
+                    this.harvestTarget = null; this.state = STATE.IDLE; return;
+                }
+                this.carryWood = taken;
             }
             // Return to base
             this.state = STATE.RETURNING;
@@ -310,10 +411,25 @@ export class Unit extends Entity {
             this.carryWood = 0;
             // Go back to harvest
             if (this.harvestTarget) {
-                const t = game.tileMap.getTile(this.harvestTarget.tx, this.harvestTarget.ty);
-                if (t && (t.goldLeft > 0 || t.type === 3)) { // still has resources
+                const { tx, ty, rtype } = this.harvestTarget;
+                const t = game.tileMap.getTile(tx, ty);
+                const stillHasGold = rtype === 'gold' && t && t.goldLeft > 0;
+                // Wood: tile is still FOREST (woodLeft > 0 means tree still standing)
+                const stillHasWood = rtype === 'wood' && t && t.type === 2; // TILE.FOREST = 2
+                if (stillHasGold || stillHasWood) {
                     this.state = STATE.HARVESTING;
                     this.harvestTimer = 0;
+                } else if (rtype === 'wood') {
+                    // Find adjacent forest tile if this one is gone
+                    const adj = this._findNearbyForest(game);
+                    if (adj) {
+                        this.harvestTarget = { tx: adj.tx, ty: adj.ty, rtype: 'wood' };
+                        this.state = STATE.HARVESTING;
+                        this.harvestTimer = 0;
+                    } else {
+                        this.state = STATE.IDLE;
+                        this.harvestTarget = null;
+                    }
                 } else {
                     this.state = STATE.IDLE;
                     this.harvestTarget = null;
@@ -324,6 +440,23 @@ export class Unit extends Entity {
         } else {
             this._moveTowards(this.returnTarget.x, this.returnTarget.y, dt, game);
         }
+    }
+
+    /** Find nearest forest tile within 8 tiles */
+    _findNearbyForest(game) {
+        const myTx = this.tx, myTy = this.ty;
+        let best = null, bestDist = Infinity;
+        for (let dy = -8; dy <= 8; dy++) {
+            for (let dx = -8; dx <= 8; dx++) {
+                const tx = myTx + dx, ty = myTy + dy;
+                const t = game.tileMap.getTile(tx, ty);
+                if (t && t.type === 2) { // FOREST
+                    const d = Math.abs(dx) + Math.abs(dy);
+                    if (d < bestDist) { bestDist = d; best = { tx, ty }; }
+                }
+            }
+        }
+        return best;
     }
 
     _moveTowards(tx, ty, dt, game) {
@@ -389,6 +522,7 @@ export class Unit extends Entity {
     }
 
     get statusText() {
+        if (this.state === STATE.CONSTRUCTING) return `🔨 En construction${this.buildTarget ? ` (${this.buildTarget.label})` : ''}`;
         if (this.state === STATE.HARVESTING) return `⛏ Récolt.${this.carryGold ? '🪙' : ''}${this.carryWood ? '🪵' : ''}`;
         if (this.state === STATE.RETURNING) return '🏠 Retour à la base';
         if (this.state === STATE.MOVING) return '🚶 En déplacement';

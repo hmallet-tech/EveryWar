@@ -1,5 +1,6 @@
 // js/world/MapGenerator.js – Procedural map generation with noise
-import { TILE, MAP_W, MAP_H } from '../constants.js';
+import { TILE } from '../constants.js';
+import { MapConfig } from '../mapConfig.js';
 
 // Simple Perlin-like noise via value noise + interpolation
 function lerp(a, b, t) { return a + t * (b - a); }
@@ -40,79 +41,105 @@ class ValueNoise {
 export function generateMap(map, type = 'random', seed) {
     const s = seed || Math.floor(Math.random() * 100000);
     const noise = new ValueNoise(s);
+    const W = MapConfig.W, H = MapConfig.H;
 
     // Generate heightmap
-    const h = new Float32Array(MAP_W * MAP_H);
-    const m = new Float32Array(MAP_W * MAP_H); // moisture
+    const h = new Float32Array(W * H);
+    const m = new Float32Array(W * H); // moisture
 
-    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-        h[y * MAP_W + x] = noise.octave(x, y, 5, 0.025, 1);
-        m[y * MAP_W + x] = noise.octave(x + 1000, y + 1000, 4, 0.04, 1);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        h[y * W + x] = noise.octave(x, y, 5, 0.025, 1);
+        m[y * W + x] = noise.octave(x + 1000, y + 1000, 4, 0.04, 1);
     }
 
-    // Island mask (fade edges to water)
     if (type === 'islands') {
-        for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-            const dx = (x - MAP_W / 2) / (MAP_W / 2), dy = (y - MAP_H / 2) / (MAP_H / 2);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const dx = (x - W / 2) / (W / 2), dy = (y - H / 2) / (H / 2);
             const mask = 1 - Math.min(1, (dx * dx + dy * dy) * 1.2);
-            h[y * MAP_W + x] = h[y * MAP_W + x] * mask - 0.05;
+            h[y * W + x] = h[y * W + x] * mask - 0.05;
         }
     } else if (type === 'highlands') {
-        // More mountains
-        for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-            h[y * MAP_W + x] += noise.octave(x, y, 3, 0.08, 0.4);
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const idx = y * W + x;
+            h[idx] += 0.25;
+            h[idx] += noise.octave(x, y, 3, 0.07, 0.35);
+            const perpDist = Math.abs((y - x) / Math.sqrt(2));
+            if (perpDist < 14) {
+                h[idx] = Math.min(h[idx], 0.55);
+            }
         }
     }
 
     // Convert height/moisture to tiles
-    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
-        const ht = h[y * MAP_W + x], ms = m[y * MAP_W + x];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const ht = h[y * W + x], ms = m[y * W + x];
         let ttype, variant = Math.floor(Math.abs(noise.noise(x * .7, y * .7) * 3));
-        if (ht < -0.15) ttype = TILE.DEEP_WATER;
-        else if (ht < 0.0) ttype = TILE.WATER;
-        else if (ht < 0.05) ttype = (ms > 0) ? TILE.SAND : TILE.GRASS;
-        else if (ht < 0.45) ttype = (ms > 0.1) ? TILE.FOREST : TILE.GRASS;
-        else if (ht < 0.65) ttype = TILE.GRASS;
-        else ttype = TILE.MOUNTAIN;
+        if (type === 'highlands') {
+            if (ht < 0.05) ttype = TILE.GRASS;
+            else if (ht < 0.1) ttype = (ms > 0.2) ? TILE.FOREST : TILE.GRASS;
+            else if (ht < 0.48) ttype = (ms > 0.12) ? TILE.FOREST : TILE.GRASS;
+            else if (ht < 0.62) ttype = TILE.GRASS;
+            else ttype = TILE.MOUNTAIN;
+        } else {
+            if (ht < -0.15) ttype = TILE.DEEP_WATER;
+            else if (ht < 0.0) ttype = TILE.WATER;
+            else if (ht < 0.05) ttype = (ms > 0) ? TILE.SAND : TILE.GRASS;
+            else if (ht < 0.45) ttype = (ms > 0.1) ? TILE.FOREST : TILE.GRASS;
+            else if (ht < 0.65) ttype = TILE.GRASS;
+            else ttype = TILE.MOUNTAIN;
+        }
         map.setTile(x, y, ttype, variant % 3);
     }
 
-    // Place starting areas (top-left and bottom-right quadrants) – ensure clear
+    // Place starting areas — adapt spawn positions to map size
     const starts = [
         { tx: 8, ty: 8 },
-        { tx: MAP_W - 12, ty: MAP_H - 12 }
+        { tx: W - 12, ty: H - 12 }
     ];
     for (const { tx, ty } of starts) {
-        for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+        for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
             const x = tx + dx, y = ty + dy;
-            if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) continue;
+            if (x < 0 || x >= W || y < 0 || y >= H) continue;
             const t = map.getTile(x, y);
             if (t.type !== TILE.GRASS) map.setTile(x, y, TILE.GRASS, (Math.abs(dx + dy)) % 3);
         }
-        // Place gold mine nearby
-        const mx = tx + 7, my = ty + 2;
+
+        const mx = tx + 6, my = ty + 1;
         map.setTile(mx, my, TILE.GOLD_MINE);
         const gt = map.getTile(mx, my);
-        gt.goldLeft = 2000;
-        // Place forest patch
-        for (let dy = -2; dy <= 2; dy++) for (let dx = 8; dx <= 14; dx++) {
-            const ft = map.getTile(tx + dx, ty + dy);
-            if (ft && ft.type === TILE.GRASS) map.setTile(tx + dx, ty + dy, TILE.FOREST, 0);
-        }
+        gt.goldLeft = 20000;
+
+        _placeForestPatch(map, tx - 1, ty - 4, 4, 3);
+        _placeForestPatch(map, tx + 4, ty + 6, 5, 3);
     }
 
-    // Extra gold mines scattered around
+    // Extra gold mines
     const mineCount = 6;
     const rng = new ValueNoise(s + 1);
     for (let i = 0; i < mineCount; i++) {
-        const mx = Math.floor(20 + (rng.noise(i * .3, 0) * 0.5 + 0.5) * (MAP_W - 40));
-        const my = Math.floor(20 + (rng.noise(0, i * .3) * 0.5 + 0.5) * (MAP_H - 40));
+        const mx = Math.floor(20 + (rng.noise(i * .3, 0) * 0.5 + 0.5) * (W - 40));
+        const my = Math.floor(20 + (rng.noise(0, i * .3) * 0.5 + 0.5) * (H - 40));
         const t = map.getTile(mx, my);
         if (t && t.type === TILE.GRASS && !t.goldLeft) {
             map.setTile(mx, my, TILE.GOLD_MINE);
-            t.goldLeft = 1500;
+            t.goldLeft = 15000;
         }
     }
 
     return { spawn1: starts[0], spawn2: starts[1] };
 }
+
+/** Place a guaranteed forest patch, only overwriting grass tiles */
+function _placeForestPatch(map, cx, cy, w, h) {
+    const W = MapConfig.W, H = MapConfig.H;
+    for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) {
+        const x = cx + dx, y = cy + dy;
+        if (x < 0 || x >= W || y < 0 || y >= H) continue;
+        const t = map.getTile(x, y);
+        if (t && (t.type === TILE.GRASS || t.type === TILE.FOREST)) {
+            map.setTile(x, y, TILE.FOREST, 0);
+            t.woodLeft = 100;
+        }
+    }
+}
+

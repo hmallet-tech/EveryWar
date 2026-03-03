@@ -19,7 +19,7 @@ export class BuildMenu {
             flexWrap: 'wrap', gap: '6px', padding: '10px',
             background: 'rgba(10,5,0,0.96)',
             border: '2px solid #6a4800', borderRadius: '6px',
-            maxWidth: '500px', zIndex: '20', pointerEvents: 'all'
+            maxWidth: '500px', zIndex: '100', pointerEvents: 'all'
         });
         document.getElementById('hud').appendChild(this.el);
     }
@@ -32,19 +32,37 @@ export class BuildMenu {
         this.open = true;
         this.el.style.display = 'flex';
 
+        // Build set of completed building types the player already has
+        const playerBuilt = new Set(
+            g.entities
+                .filter(e => !e.dead && e.faction === g.playerFaction && e.type === 'building' && e.isComplete)
+                .map(e => e.bKey)
+        );
+
         fd.buildings.forEach(bKey => {
             const data = BUILDINGS[bKey];
-            if (!data || data.isBase) return; // can't manually place base
+            if (!data || data.isBase || data.upgradeOf) return; // skip bases and upgrades
             const canAfford = eco.gold >= (data.cost.gold || 0) && eco.wood >= (data.cost.wood || 0);
+            const reqKey = data.requires;
+            const reqMet = !reqKey || playerBuilt.has(reqKey);
+            const reqLabel = reqKey ? (BUILDINGS[reqKey]?.label || reqKey) : null;
+
             const btn = document.createElement('button');
-            btn.className = 'cmd-btn' + (canAfford ? '' : ' disabled');
+            const enabled = canAfford && reqMet;
+            btn.className = 'cmd-btn' + (enabled ? '' : ' disabled');
             btn.style.width = '70px'; btn.style.height = '70px';
             btn.innerHTML = `
         <span class="ci">${data.icon}</span>
         <span class="cl">${data.label}</span>
         <span class="cc">🪙${data.cost.gold || 0}${data.cost.wood ? ` 🪵${data.cost.wood}` : ''}</span>`;
-            btn.title = data.desc || '';
-            if (canAfford) {
+
+            if (!reqMet && reqLabel) {
+                btn.title = `⚠ Nécessite : ${reqLabel}`;
+            } else {
+                btn.title = data.desc || '';
+            }
+
+            if (enabled) {
                 btn.onclick = () => {
                     g.startBuild(bKey);
                     this.hide();

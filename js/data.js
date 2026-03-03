@@ -106,16 +106,16 @@ export const BUILDINGS = {
     town_hall: {
         faction: FACTION.HUMAN, label: 'Town Hall', icon: '🏰',
         hp: 1200, armor: 5, sight: 7,
-        cost: { gold: 1200, wood: 800 }, buildTime: 120,
+        cost: { gold: 240, wood: 160 }, buildTime: 40,
         size: [4, 4], isBase: true,
         produces: ['peasant'],
         upgrades: ['keep'],
         desc: 'Centre de commandement humain'
     },
     keep: {
-        faction: FACTION.HUMAN, label: 'Keep', icon: '🏯',
+        faction: FACTION.HUMAN, label: 'Keep', icon: '🏰',
         hp: 1600, armor: 6, sight: 9,
-        cost: { gold: 2000, wood: 1000 }, buildTime: 150,
+        cost: { gold: 400, wood: 200 }, buildTime: 50,
         size: [4, 4], isBase: true, upgradeOf: 'town_hall',
         produces: ['peasant'],
         upgrades: ['castle'],
@@ -124,7 +124,7 @@ export const BUILDINGS = {
     castle: {
         faction: FACTION.HUMAN, label: 'Castle', icon: '🏰',
         hp: 2000, armor: 8, sight: 10,
-        cost: { gold: 2500, wood: 1200 }, buildTime: 180,
+        cost: { gold: 500, wood: 240 }, buildTime: 60,
         size: [4, 4], isBase: true, upgradeOf: 'keep',
         produces: ['peasant', 'paladin'],
         desc: 'Forteresse ultime – invocation du Paladin'
@@ -132,7 +132,7 @@ export const BUILDINGS = {
     barracks: {
         faction: FACTION.HUMAN, label: 'Caserne', icon: '⚔️',
         hp: 800, armor: 3, sight: 6,
-        cost: { gold: 700, wood: 450 }, buildTime: 70,
+        cost: { gold: 140, wood: 90 }, buildTime: 23,
         size: [3, 3],
         produces: ['footman', 'archer'],
         requires: 'town_hall',
@@ -141,23 +141,23 @@ export const BUILDINGS = {
     farm: {
         faction: FACTION.HUMAN, label: 'Ferme', icon: '🌾',
         hp: 400, armor: 0, sight: 4,
-        cost: { gold: 500, wood: 250 }, buildTime: 40,
+        cost: { gold: 100, wood: 50 }, buildTime: 13,
         size: [2, 2], foodBonus: 4,
         desc: 'Fournit +4 de nourriture'
     },
     blacksmith: {
         faction: FACTION.HUMAN, label: 'Forgeron', icon: '⚒️',
         hp: 700, armor: 3, sight: 5,
-        cost: { gold: 800, wood: 450 }, buildTime: 60,
+        cost: { gold: 160, wood: 90 }, buildTime: 20,
         size: [2, 2],
         researches: ['weapon1', 'weapon2', 'weapon3', 'armor1', 'armor2', 'armor3', 'cavalry_training'],
         requires: 'barracks',
         desc: 'Améliorations offensives et défensives'
     },
     tower: {
-        faction: FACTION.HUMAN, label: 'Tour de Défense', icon: '🗼',
+        faction: FACTION.HUMAN, label: 'Tour de Défense', icon: '🗻',
         hp: 500, armor: 5, sight: 9,
-        cost: { gold: 550, wood: 200 }, buildTime: 35,
+        cost: { gold: 110, wood: 40 }, buildTime: 12,
         size: [1, 2],
         dmg: 20, range: 7, attackRate: 2.0,
         projectile: 'arrow',
@@ -168,7 +168,7 @@ export const BUILDINGS = {
     mage_tower: {
         faction: FACTION.HUMAN, label: 'Tour des Mages', icon: '🔮',
         hp: 600, armor: 2, sight: 7,
-        cost: { gold: 1000, wood: 600 }, buildTime: 90,
+        cost: { gold: 200, wood: 120 }, buildTime: 30,
         size: [2, 3],
         produces: ['mage'],
         researches: ['magic_range', 'splash_upgrade'],
@@ -178,7 +178,7 @@ export const BUILDINGS = {
     wall: {
         faction: FACTION.HUMAN, label: 'Mur', icon: '🧱',
         hp: 350, armor: 8, sight: 3,
-        cost: { gold: 200, wood: 100 }, buildTime: 15,
+        cost: { gold: 40, wood: 20 }, buildTime: 5,
         size: [1, 1], isWall: true,
         desc: 'Fortification passive'
     },
@@ -187,7 +187,7 @@ export const BUILDINGS = {
     great_hall: {
         faction: FACTION.ORC, label: 'Grande Salle', icon: '🔥',
         hp: 1200, armor: 5, sight: 7,
-        cost: { gold: 1200, wood: 800 }, buildTime: 120,
+        cost: { gold: 240, wood: 160 }, buildTime: 40,
         size: [4, 4], isBase: true,
         produces: ['grunt'],
         upgrades: ['stronghold'],
@@ -196,16 +196,16 @@ export const BUILDINGS = {
     stronghold: {
         faction: FACTION.ORC, label: 'Forteresse Orc', icon: '💀',
         hp: 1600, armor: 6, sight: 9,
-        cost: { gold: 2000, wood: 1000 }, buildTime: 150,
+        cost: { gold: 400, wood: 200 }, buildTime: 50,
         size: [4, 4], isBase: true, upgradeOf: 'great_hall',
         produces: ['grunt'],
         upgrades: ['fortress'],
         desc: 'Grande Salle améliorée'
     },
     fortress: {
-        faction: FACTION.ORC, label: 'Citadelle Orc', icon: '🏚️',
+        faction: FACTION.ORC, label: 'Citadelle Orc', icon: '🏐️',
         hp: 2000, armor: 8, sight: 10,
-        cost: { gold: 2500, wood: 1200 }, buildTime: 180,
+        cost: { gold: 500, wood: 240 }, buildTime: 60,
         size: [4, 4], isBase: true, upgradeOf: 'stronghold',
         produces: ['grunt', 'beastmaster'],
         desc: 'Citadelle ultime – invoque le Beastmaster'
@@ -213,7 +213,7 @@ export const BUILDINGS = {
     orc_barracks: {
         faction: FACTION.ORC, label: 'Corps de Garde', icon: '🪓',
         hp: 800, armor: 3, sight: 6,
-        cost: { gold: 700, wood: 450 }, buildTime: 70,
+        cost: { gold: 140, wood: 90 }, buildTime: 23,
         size: [3, 3],
         produces: ['berserker', 'goblin_archer'],
         requires: 'great_hall',
@@ -222,23 +222,23 @@ export const BUILDINGS = {
     pig_farm: {
         faction: FACTION.ORC, label: 'Enclos à Cochons', icon: '🐷',
         hp: 400, armor: 0, sight: 4,
-        cost: { gold: 500, wood: 250 }, buildTime: 40,
+        cost: { gold: 100, wood: 50 }, buildTime: 13,
         size: [2, 2], foodBonus: 4,
         desc: 'Fournit +4 de nourriture'
     },
     forge: {
         faction: FACTION.ORC, label: 'Forge Orc', icon: '🔨',
         hp: 700, armor: 3, sight: 5,
-        cost: { gold: 800, wood: 450 }, buildTime: 60,
+        cost: { gold: 160, wood: 90 }, buildTime: 20,
         size: [2, 2],
         researches: ['weapon1', 'weapon2', 'weapon3', 'armor1', 'armor2', 'armor3', 'cavalry_training'],
         requires: 'orc_barracks',
         desc: 'Améliorations de combat orcs'
     },
     watch_tower: {
-        faction: FACTION.ORC, label: 'Tour de Guet', icon: '🗼',
+        faction: FACTION.ORC, label: 'Tour de Guet', icon: '🗻',
         hp: 500, armor: 5, sight: 9,
-        cost: { gold: 550, wood: 200 }, buildTime: 35,
+        cost: { gold: 110, wood: 40 }, buildTime: 12,
         size: [1, 2],
         dmg: 18, range: 7, attackRate: 1.8,
         projectile: 'arrow',
@@ -249,7 +249,7 @@ export const BUILDINGS = {
     altar: {
         faction: FACTION.ORC, label: 'Autel des Tempêtes', icon: '⚡',
         hp: 600, armor: 2, sight: 7,
-        cost: { gold: 1000, wood: 600 }, buildTime: 90,
+        cost: { gold: 200, wood: 120 }, buildTime: 30,
         size: [2, 3],
         produces: ['shaman'],
         researches: ['magic_range', 'lightning_chain'],
@@ -259,7 +259,7 @@ export const BUILDINGS = {
     orc_wall: {
         faction: FACTION.ORC, label: 'Pieux', icon: '🪵',
         hp: 300, armor: 6, sight: 3,
-        cost: { gold: 200, wood: 100 }, buildTime: 15,
+        cost: { gold: 40, wood: 20 }, buildTime: 5,
         size: [1, 1], isWall: true,
         desc: 'Barricade de bois'
     },

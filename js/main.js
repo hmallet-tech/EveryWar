@@ -2,6 +2,7 @@
 
 import { Game } from './Game.js';
 import { BuildMenu } from './ui/BuildMenu.js';
+import { MapConfig } from './mapConfig.js';
 
 // ─── DOM helpers ────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -19,6 +20,7 @@ let buildMenu = null;
 let selectedFaction = 'human';
 let selectedDiff = 'easy';
 let selectedMap = 'random';
+let selectedSize = 'medium';
 
 // ─── Loading sequence ────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
@@ -81,6 +83,15 @@ function _bindMenus() {
         });
     });
 
+    // Map size
+    document.querySelectorAll('.choice-btn[data-size]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.choice-btn[data-size]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedSize = btn.dataset.size;
+        });
+    });
+
     $('btn-back').onclick = () => { hide('setup-screen'); show('main-menu'); };
     $('btn-start').onclick = () => { hide('setup-screen'); _startGame(); };
 
@@ -122,6 +133,9 @@ function _startGame() {
     // Destroy old game
     if (animFrame) cancelAnimationFrame(animFrame);
     game = null;
+
+    // Apply map size BEFORE creating Game (TileMap/FogOfWar read MapConfig at construction)
+    MapConfig.setSize(selectedSize);
 
     game = new Game(canvas, selectedFaction, selectedDiff, selectedMap);
 

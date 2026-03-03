@@ -1,28 +1,29 @@
 // js/world/TileMap.js – 2D tile grid with pathfinding support
-import { TILE, TILE_SIZE, MAP_W, MAP_H } from '../constants.js';
+import { TILE, TILE_SIZE } from '../constants.js';
+import { MapConfig } from '../mapConfig.js';
 
 export class TileMap {
     constructor() {
-        this.w = MAP_W;
-        this.h = MAP_H;
+        const W = MapConfig.W, H = MapConfig.H;
+        this.w = W;
+        this.h = H;
         // tiles[y][x] = { type, variant, goldLeft, hasTree }
-        this.tiles = Array.from({ length: MAP_H }, () =>
-            Array.from({ length: MAP_W }, () => ({ type: TILE.GRASS, variant: 0, goldLeft: 0, hasTree: true }))
+        this.tiles = Array.from({ length: H }, () =>
+            Array.from({ length: W }, () => ({ type: TILE.GRASS, variant: 0, goldLeft: 0, woodLeft: 0, hasTree: true }))
         );
         // pathfinding cost grid (0 = impassable)
-        this.passable = new Uint8Array(MAP_W * MAP_H);
-        this.moveCost = new Float32Array(MAP_W * MAP_H);
+        this.passable = new Uint8Array(W * H);
+        this.moveCost = new Float32Array(W * H);
         // which tiles have occupants (for collision)
-        this.occupied = new Int32Array(MAP_W * MAP_H).fill(-1); // entity id or -1
+        this.occupied = new Int32Array(W * H).fill(-1); // entity id or -1
     }
 
     setTile(tx, ty, type, variant = 0) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return;
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return;
         const t = this.tiles[ty][tx];
         t.type = type;
         t.variant = variant;
-        // update passability
-        const idx = ty * MAP_W + tx;
+        const idx = ty * this.w + tx;
         if (type === TILE.WATER || type === TILE.DEEP_WATER || type === TILE.MOUNTAIN) {
             this.passable[idx] = 0;
             this.moveCost[idx] = 999;
@@ -36,33 +37,33 @@ export class TileMap {
     }
 
     getTile(tx, ty) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return null;
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return null;
         return this.tiles[ty][tx];
     }
 
     isPassable(tx, ty) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return false;
-        return this.passable[ty * MAP_W + tx] === 1;
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return false;
+        return this.passable[ty * this.w + tx] === 1;
     }
 
     getCost(tx, ty) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return 999;
-        return this.moveCost[ty * MAP_W + tx];
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return 999;
+        return this.moveCost[ty * this.w + tx];
     }
 
     isOccupied(tx, ty) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return true;
-        return this.occupied[ty * MAP_W + tx] !== -1;
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return true;
+        return this.occupied[ty * this.w + tx] !== -1;
     }
 
     setOccupied(tx, ty, entityId) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return;
-        this.occupied[ty * MAP_W + tx] = entityId;
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return;
+        this.occupied[ty * this.w + tx] = entityId;
     }
 
     clearOccupied(tx, ty, entityId) {
-        if (tx < 0 || tx >= MAP_W || ty < 0 || ty >= MAP_H) return;
-        const idx = ty * MAP_W + tx;
+        if (tx < 0 || tx >= this.w || ty < 0 || ty >= this.h) return;
+        const idx = ty * this.w + tx;
         if (this.occupied[idx] === entityId) this.occupied[idx] = -1;
     }
 
@@ -71,7 +72,7 @@ export class TileMap {
         for (let r = 0; r < th; r++) for (let c = 0; c < tw; c++) {
             const x = tx + c, y = ty + r;
             this.setOccupied(x, y, entityId);
-            const idx = y * MAP_W + x;
+            const idx = y * this.w + x;
             this.passable[idx] = 0;
             this.moveCost[idx] = 999;
         }
@@ -83,8 +84,7 @@ export class TileMap {
             const tile = this.getTile(x, y);
             if (!tile) continue;
             this.clearOccupied(x, y, entityId);
-            // restore passability based on tile type
-            const idx = y * MAP_W + x;
+            const idx = y * this.w + x;
             if (tile.type !== TILE.WATER && tile.type !== TILE.DEEP_WATER && tile.type !== TILE.MOUNTAIN) {
                 this.passable[idx] = 1;
                 this.moveCost[idx] = tile.type === TILE.FOREST ? 2.0 : 1.0;
@@ -126,19 +126,23 @@ export class TileMap {
         return { x: tx * TILE_SIZE + TILE_SIZE / 2, y: ty * TILE_SIZE + TILE_SIZE / 2 };
     }
 
-    /** Harvest a tree at tx,ty – returns false if no tree */
-    harvestTree(tx, ty) {
+    /** Harvest a tree at tx,ty – takes 10 wood per trip, disappears at 0. */
+    harvestTree(tx, ty, amount = 10) {
         const t = this.getTile(tx, ty);
-        if (!t || t.type !== TILE.FOREST) return false;
-        t.hasTree = false;
-        t.type = TILE.GRASS;
-        const idx = ty * MAP_W + tx;
-        this.passable[idx] = 1;
-        this.moveCost[idx] = 1.0;
-        return true;
+        if (!t || t.type !== TILE.FOREST) return 0;
+        if (!t.woodLeft || t.woodLeft <= 0) t.woodLeft = 100;
+        const taken = Math.min(amount, t.woodLeft);
+        t.woodLeft -= taken;
+        if (t.woodLeft <= 0) {
+            t.hasTree = false;
+            t.type = TILE.GRASS;
+            const idx = ty * this.w + tx;
+            this.passable[idx] = 1;
+            this.moveCost[idx] = 1.0;
+        }
+        return taken;
     }
 
-    /** Harvest gold from mine at tx,ty */
     harvestGold(tx, ty, amount) {
         const t = this.getTile(tx, ty);
         if (!t || t.type !== TILE.GOLD_MINE) return 0;
@@ -146,7 +150,7 @@ export class TileMap {
         t.goldLeft -= taken;
         if (t.goldLeft <= 0) {
             t.type = TILE.MOUNTAIN;
-            const idx = ty * MAP_W + tx;
+            const idx = ty * this.w + tx;
             this.passable[idx] = 0;
             this.moveCost[idx] = 999;
         }

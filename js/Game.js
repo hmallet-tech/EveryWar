@@ -511,16 +511,13 @@ export class Game {
         eco.wood -= (data.cost.wood || 0);
         const b = this.placeBuilding(bKey, this.playerFaction, tx, ty, false);
         if (!b) return;
-        // Assign a worker to build
-        const worker = this.entities.find(e => !e.dead && e.faction === this.playerFaction && e.isWorker && e.state === STATE.IDLE);
+        // Assign the currently selected worker (or any idle worker) to build
+        const selectedWorker = this.selection.selected.find(e => !e.dead && e.isWorker && e.state !== STATE.CONSTRUCTING);
+        const idleWorker = this.entities.find(e => !e.dead && e.faction === this.playerFaction && e.isWorker && e.state === STATE.IDLE);
+        const worker = selectedWorker || idleWorker;
         if (worker) {
-            worker.state = STATE.CONSTRUCTING;
-            worker.moveTarget = { x: b.x, y: b.y };
             const path = this.pathfinder.find(worker.tx, worker.ty, b.tx0, b.ty0);
-            worker.path = path || [];
-            worker.pathIndex = 0;
-            // Simulate construction: just speed up building
-            b.buildTime *= 0.8;
+            worker.startConstruct(b, path);
             b.builderRef = worker;
         }
         this.hud.addAlert(`🔨 Construction de ${b.label}`, 'info');
